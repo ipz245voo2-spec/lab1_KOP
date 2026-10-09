@@ -1,121 +1,95 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
 import './App.css'
 
+import { agencies, dashboardInfo, missions } from './data/mock';
+import { formatDate } from './utils/formatDate';
+
+import Icon from './components/Icon';
+import Dashboard from './components/Dashboard';
+
 function App() {
-  const [count, setCount] = useState(0)
+  const launch = missions
+    .filter((mission) =>
+      mission.net >= dashboardInfo.snapshotISO &&
+      mission.status.id !== 'hold'
+    );
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+  const nextLaunch = launch.toSorted((left, right) =>
+    new Date(left.net) - new Date(right.net)
+  )[0];
+
+  const totalLaunches = agencies.reduce(
+    (total, agency) => total + agency.count,
+    0,
+  );
+
+  const totalChange = agencies.reduce(
+    (total, agency) => total + Number(agency.change),
+    0,
+  );
+
+  const daysToNext = nextLaunch
+    ? Math.ceil(
+      (new Date(nextLaunch.net.slice(0, 10)) -
+        new Date(dashboardInfo.snapshotISO.slice(0, 10))) /
+      86400000,
+    ) : 0;
+
+
+  const kpis = [
+    {
+      id: 'next',
+      title: 'Найближчий запуск',
+      value: nextLaunch ? formatDate(nextLaunch.net) : '—',
+      unit: '',
+      change: nextLaunch ? `Через ${daysToNext} діб` : 'Немає місій',
+      description: nextLaunch?.name ?? 'Очікуємо новий розклад',
+      icon: 'rocket',
+      accent: 'lavender',
+    },
+    {
+      id: 'total',
+      title: `Запуски у ${dashboardInfo.year}`,
+      value: totalLaunches,
+      unit: 'запусків',
+      change: `+${totalChange}`,
+      description: 'до попереднього демо-періоду',
+      icon: 'calendar',
+      accent: 'lime',
+    },
+    {
+      id: 'agencies',
+      title: 'Агенції в огляді',
+      value: agencies.length.toString().padStart(2, '0'),
+      unit: 'агенції',
+      change: `+${agencies.length - dashboardInfo.previousAgencyCount}`,
+      description: 'до попереднього демо-періоду',
+      icon: 'globe',
+      accent: 'peach',
+    },
+  ];
+
+ return (
+    <Dashboard info={dashboardInfo} missionCount={missions.length}>
+      <section className="page-heading">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+          <p className="eyebrow">Космос ближче, ніж здається</p>
+          <h1>
+            Космічні запуски<span> / огляд</span>
+          </h1>
+          <p>Місії, агенції та наступний крок за межі Землі.</p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
+        <div className="snapshot">
+          <Icon name="calendar" size={17} />
+          <span>Зріз на {dashboardInfo.snapshot}</span>
         </div>
       </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      <div className="demo-notice">
+        <span className="demo-pill">MOCK DATA</span>
+        <p>
+          Усі місії, дати й показники демонстраційні.
+        </p>
+      </div>
+    </Dashboard>
   )
 }
 
