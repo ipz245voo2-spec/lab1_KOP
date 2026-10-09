@@ -5,6 +5,10 @@ import { formatDate } from './utils/formatDate';
 
 import Icon from './components/Icon';
 import Dashboard from './components/Dashboard';
+import FilteredList from './components/FilteredList';
+import KpiCard from './components/KpiCard';
+import Toggle from './components/Toggle';
+import Counter from './components/Counter';
 
 function App() {
   const launch = missions
@@ -94,6 +98,30 @@ function App() {
           <KpiCard key={kpi.id} {...kpi} />
         ))}
       </section>
+      <div id="missions">
+        <FilteredList
+          title="Найближчі місії"
+          items={missions}
+          categories={agencies}
+          year={dashboardInfo.year}
+        />
+      </div>
+      <div className="controls-grid" id="plan">
+        <Counter
+          title="Запуски до перегляду"
+          initialValue={2}
+          min={0}
+          max={10}
+          step={1}
+          unit="у моєму плані"
+        />
+        <Toggle
+          title="Режим відображення"
+          lightLabel="Світла тема"
+          darkLabel="Темна тема"
+          preview={{ label: 'На орбіті', title: 'Власний погляд на космос' }}
+        />
+      </div>
     </Dashboard>
   )
 }
