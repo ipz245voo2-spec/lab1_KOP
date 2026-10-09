@@ -68,7 +68,7 @@ function App() {
     },
   ];
 
- return (
+  return (
     <Dashboard info={dashboardInfo} missionCount={missions.length}>
       <section className="page-heading">
         <div>
@@ -89,6 +89,11 @@ function App() {
           Усі місії, дати й показники демонстраційні.
         </p>
       </div>
+      <section className="kpi-grid" aria-label="Ключові показники">
+        {kpis.map((kpi) => (
+          <KpiCard key={kpi.id} {...kpi} />
+        ))}
+      </section>
     </Dashboard>
   )
 }

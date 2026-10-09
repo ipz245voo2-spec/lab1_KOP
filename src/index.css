@@ -15,6 +15,9 @@
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
+  font-weight: 400;
+  line-height: 1.5;
+
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
   color-scheme: light dark;
@@ -301,4 +304,70 @@ code {
   align-items: center;
   gap: 22px;
   margin-bottom: 24px;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 25px;
+}
+.kpi-card {
+  border-radius: 13px;
+  padding: 22px 23px;
+  min-height: 172px;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-lavender {
+  background: #d8def3;
+}
+.kpi-lime {
+  background: #e0edbf;
+}
+.kpi-peach {
+  background: #f0ded0;
+}
+.kpi-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.kpi-top h2 {
+  font-size: 12px;
+  font-weight: 500;
+}
+.kpi-top > svg {
+  color: #61716c;
+}
+.kpi-value {
+  font-size: 40px;
+  letter-spacing: -1.7px;
+  line-height: 1.25;
+  margin: 17px 0 14px;
+  font-weight: 600;
+}
+.kpi-value > span {
+  font-size: 11px;
+  letter-spacing: 0;
+  font-weight: 400;
+  margin-left: 9px;
+}
+.kpi-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.change {
+  font-size: 9px;
+  font-weight: 600;
+  background: #ffffff69;
+  border-radius: 20px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.kpi-bottom p {
+  font-size: 9px;
+  color: #687265;
 }
