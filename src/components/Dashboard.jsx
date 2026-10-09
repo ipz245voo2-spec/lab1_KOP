@@ -1,6 +1,6 @@
 import Icon from './Icon';
 
-export default function Dashboard({ info, missionCount, children }) {
+export default function Dashboard({ info, children }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -21,7 +21,7 @@ export default function Dashboard({ info, missionCount, children }) {
             </a>
             <a className="nav-link" href="#missions">
               <Icon name="rocket" />
-              Місії<span>{String(missionCount).padStart(2, '0')}</span>
+              Місії
             </a>
             <a className="nav-link" href="#plan">
               <Icon name="calendar" />
@@ -33,8 +33,8 @@ export default function Dashboard({ info, missionCount, children }) {
           <span className="live-dot" />
           <p>Навчальний простір</p>
           <span>
-            Launch Library 2<br />
-            локальні mock-дані
+            The Space Devs API<br />
+            ll.thespacedevs.com
           </span>
         </div>
         <div className="student">
@@ -51,17 +51,17 @@ export default function Dashboard({ info, missionCount, children }) {
         <header className="topbar">
           <span>
             Робочий простір <span className="breadcrumb-separator">/</span>{' '}
-            <strong>Огляд запусків</strong>
+            <strong>Огляд космічних запусків</strong>
           </span>
-          <span className="mock-badge">
-            <span />
-            Демо · без API
+          <span className="mock-badge live-badge">
+            <span className="pulse-dot" />
+            ЛР2 · Live Space Devs API
           </span>
         </header>
         <div className="main-content">
           {children}
           <footer className="page-footer">
-            <span>Лабораторна робота № 1 · React / props / useState</span>
+            <span>Лабораторна робота № 2 · useEffect / API / Container & Presentational / Derived State</span>
             <span>
               {info.group} · Варіант {info.variant}
             </span>

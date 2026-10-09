@@ -1,111 +1,37 @@
-import './App.css'
+import './App.css';
 
-import { agencies, dashboardInfo, missions } from './data/mock';
-import { formatDate } from './utils/formatDate';
-
-import Icon from './components/Icon';
+import { dashboardInfo } from './data/mock';
 import Dashboard from './components/Dashboard';
-import FilteredList from './components/FilteredList';
-import KpiCard from './components/KpiCard';
-import Toggle from './components/Toggle';
+import MissionsContainer from './components/MissionsContainer';
 import Counter from './components/Counter';
+import Toggle from './components/Toggle';
+import Icon from './components/Icon';
 
 function App() {
-  const launch = missions
-    .filter((mission) =>
-      mission.net >= dashboardInfo.snapshotISO &&
-      mission.status.id !== 'hold'
-    );
-
-  const nextLaunch = launch.toSorted((left, right) =>
-    new Date(left.net) - new Date(right.net)
-  )[0];
-
-  const totalLaunches = agencies.reduce(
-    (total, agency) => total + agency.count,
-    0,
-  );
-
-  const totalChange = agencies.reduce(
-    (total, agency) => total + Number(agency.change),
-    0,
-  );
-
-  const daysToNext = nextLaunch
-    ? Math.ceil(
-      (new Date(nextLaunch.net.slice(0, 10)) -
-        new Date(dashboardInfo.snapshotISO.slice(0, 10))) /
-      86400000,
-    ) : 0;
-
-
-  const kpis = [
-    {
-      id: 'next',
-      title: 'Найближчий запуск',
-      value: nextLaunch ? formatDate(nextLaunch.net) : '—',
-      unit: '',
-      change: nextLaunch ? `Через ${daysToNext} діб` : 'Немає місій',
-      description: nextLaunch?.name ?? 'Очікуємо новий розклад',
-      icon: 'rocket',
-      accent: 'lavender',
-    },
-    {
-      id: 'total',
-      title: `Запуски у ${dashboardInfo.year}`,
-      value: totalLaunches,
-      unit: 'запусків',
-      change: `+${totalChange}`,
-      description: 'до попереднього демо-періоду',
-      icon: 'calendar',
-      accent: 'lime',
-    },
-    {
-      id: 'agencies',
-      title: 'Агенції в огляді',
-      value: agencies.length.toString().padStart(2, '0'),
-      unit: 'агенції',
-      change: `+${agencies.length - dashboardInfo.previousAgencyCount}`,
-      description: 'до попереднього демо-періоду',
-      icon: 'globe',
-      accent: 'peach',
-    },
-  ];
+  const todayFormatted = new Intl.DateTimeFormat('uk-UA', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date());
 
   return (
-    <Dashboard info={dashboardInfo} missionCount={missions.length}>
+    <Dashboard info={dashboardInfo}>
       <section className="page-heading">
         <div>
           <p className="eyebrow">Космос ближче, ніж здається</p>
           <h1>
-            Космічні запуски<span> / огляд</span>
+            Космічні запуски<span> / онлайн-моніторинг</span>
           </h1>
-          <p>Місії, агенції та наступний крок за межі Землі.</p>
+          <p>
+            Актуальний розклад космічних місій, аналітика агенцій та прямий зв’язок із API.
+          </p>
         </div>
         <div className="snapshot">
           <Icon name="calendar" size={17} />
-          <span>Зріз на {dashboardInfo.snapshot}</span>
+          <span>Сьогодні: {todayFormatted}</span>
         </div>
       </section>
-      <div className="demo-notice">
-        <span className="demo-pill">MOCK DATA</span>
-        <p>
-          Усі місії, дати й показники демонстраційні.
-        </p>
-      </div>
-      <section className="kpi-grid" aria-label="Ключові показники">
-        {kpis.map((kpi) => (
-          <KpiCard key={kpi.id} {...kpi} />
-        ))}
-      </section>
-      <div id="missions">
-        <FilteredList
-          title="Найближчі місії"
-          items={missions}
-          categories={agencies}
-          year={dashboardInfo.year}
-        />
-      </div>
+      <MissionsContainer currentYear={dashboardInfo.year} />
       <div className="controls-grid" id="plan">
         <Counter
           title="Запуски до перегляду"
@@ -123,7 +49,7 @@ function App() {
         />
       </div>
     </Dashboard>
-  )
+  );
 }
 
-export default App
+export default App;
