@@ -9,3 +9,7 @@ export { default as MinusIcon } from './MinusIcon';
 export { default as ResetIcon } from './ResetIcon';
 export { default as MoonIcon } from './MoonIcon';
 export { default as SunIcon } from './SunIcon';
+export { default as RefreshIcon } from './RefreshIcon';
+export { default as SearchIcon } from './SearchIcon';
+export { default as AlertIcon } from './AlertIcon';
+export { default as FilterIcon } from './FilterIcon';

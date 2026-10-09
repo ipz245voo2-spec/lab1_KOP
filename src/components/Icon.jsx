@@ -8,6 +8,10 @@ import MinusIcon from './icons/MinusIcon';
 import ResetIcon from './icons/ResetIcon';
 import MoonIcon from './icons/MoonIcon';
 import SunIcon from './icons/SunIcon';
+import RefreshIcon from './icons/RefreshIcon';
+import SearchIcon from './icons/SearchIcon';
+import AlertIcon from './icons/AlertIcon';
+import FilterIcon from './icons/FilterIcon';
 
 const icons = {
   orbit: OrbitIcon,
@@ -20,6 +24,10 @@ const icons = {
   reset: ResetIcon,
   moon: MoonIcon,
   sun: SunIcon,
+  refresh: RefreshIcon,
+  search: SearchIcon,
+  alert: AlertIcon,
+  filter: FilterIcon,
 };
 
 export default function Icon({ name, size = 20, className = '', ...props }) {
@@ -41,4 +49,8 @@ export {
   ResetIcon,
   MoonIcon,
   SunIcon,
+  RefreshIcon,
+  SearchIcon,
+  AlertIcon,
+  FilterIcon,
 };
