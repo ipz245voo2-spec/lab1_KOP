@@ -55,13 +55,13 @@ export default function Dashboard({ info, children }) {
           </span>
           <span className="mock-badge live-badge">
             <span className="pulse-dot" />
-            ЛР2 · Live Space Devs API
+            ЛР3 · react-hook-form + Custom Hooks
           </span>
         </header>
         <div className="main-content">
           {children}
           <footer className="page-footer">
-            <span>Лабораторна робота № 2 · useEffect / API / Container & Presentational / Derived State</span>
+            <span>Лабораторна робота № 3 · Контрольовані форми / react-hook-form / useDebounce / useFetch</span>
             <span>
               {info.group} · Варіант {info.variant}
             </span>
