@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
-import {
-  launchApiService,
-  FALLBACK_LAUNCHES,
-} from '../services/launchApi';
+import { useState, useMemo, useCallback } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { useDebounce, useFetch } from '../hooks';
+import { launchApiService } from '../services/launchApi';
 import { formatDate, formatRelativeDays } from '../utils/formatDate';
+import { DEFAULT_FILTERS } from '../constants/filters';
 
 import WidgetPanel from './WidgetPanel';
+import FilterPanel from './FilterPanel';
 import MissionsTable from './MissionsTable';
 import MissionDetails from './MissionDetails';
 import AgencyChart from './AgencyChart';
@@ -26,102 +27,110 @@ const AGENCY_PALETTE = [
   '#c7d7e8',
 ];
 
-export default function MissionsContainer({ currentYear = new Date().getFullYear() }) {
-  const [launches, setLaunches] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+export default function MissionsContainer({
+  currentYear = new Date().getFullYear(),
+}) {
+  const { control, reset, setValue } = useForm({
+    defaultValues: DEFAULT_FILTERS,
+  });
 
-  const [sortField, setSortField] = useState('net');
-  const [sortDirection, setSortDirection] = useState('asc');
-
-  const [selectedId, setSelectedId] = useState(null);
-  const [agencyFilter, setAgencyFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const formValues = useWatch({ control, defaultValue: DEFAULT_FILTERS });
+  const debouncedSearch = useDebounce(formValues.search, 400);
 
   const [simulateError, setSimulateError] = useState(false);
   const [simulateEmpty, setSimulateEmpty] = useState(false);
   const [isFallbackMode, setIsFallbackMode] = useState(false);
-  const [reloadIndex, setReloadIndex] = useState(0);
- 
-  useEffect(() => {
-    const controller = new AbortController();
-    let isMounted = true;
 
-    async function loadMissions() {
-      setIsLoading(true);
-      setError(null);
+  const queryParams = useMemo(
+    () => ({
+      search: debouncedSearch,
+      agency: formValues.agency,
+      ordering: formValues.ordering,
+      limit: formValues.limit,
+      status: formValues.status,
+      simulateError,
+      simulateEmpty,
+      useFallback: isFallbackMode,
+    }),
+    [
+      debouncedSearch,
+      formValues.agency,
+      formValues.ordering,
+      formValues.limit,
+      formValues.status,
+      simulateError,
+      simulateEmpty,
+      isFallbackMode,
+    ],
+  );
 
-      try {
-        const data = await launchApiService.getUpcomingLaunches({
-          limit: 25,
-          signal: controller.signal,
-          simulateError,
-          simulateEmpty,
-        });
+  const fetcher = useCallback((params, options) => {
+    return launchApiService.getUpcomingLaunches({
+      ...params,
+      ...options,
+    });
+  }, []);
 
-        if (isMounted) {
-          setLaunches(data);
-          setIsFallbackMode(false);
-          if (data.length > 0) {
-            setSelectedId((prev) => {
-              const stillExists = data.some((m) => m.id === prev);
-              return stillExists ? prev : data[0].id;
-            });
-          }
-        }
-      } catch (err) {
-        if (
-          err.name !== 'AbortError' &&
-          err.name !== 'CanceledError' &&
-          isMounted
-        ) {
-          setError(err.message || 'Не вдалося завантажити дані з API.');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
+  const {
+    data: rawLaunches,
+    loading: isLoading,
+    error,
+    refetch,
+  } = useFetch(fetcher, queryParams, {
+    initialData: [],
+  });
 
-    loadMissions();
- 
-    return () => {
-      isMounted = false;
-      controller.abort();
-    };
-  }, [reloadIndex, simulateError, simulateEmpty]);
- 
+  const launches = useMemo(() => rawLaunches || [], [rawLaunches]);
+
+  const [selectedId, setSelectedId] = useState(null);
+  const [localSortField, setLocalSortField] = useState(null);
+  const [localSortDirection, setLocalSortDirection] = useState('asc');
+
   function handleRetry() {
     setSimulateError(false);
     setSimulateEmpty(false);
-    setReloadIndex((prev) => prev + 1);
+    refetch();
   }
 
   function handleUseFallback() {
-    setIsLoading(false);
-    setError(null);
-    setLaunches(FALLBACK_LAUNCHES);
     setIsFallbackMode(true);
-    if (FALLBACK_LAUNCHES.length > 0) {
-      setSelectedId(FALLBACK_LAUNCHES[0].id);
+    setSimulateError(false);
+    setSimulateEmpty(false);
+  }
+
+  function handleFullReset() {
+    reset(DEFAULT_FILTERS);
+    setSimulateError(false);
+    setSimulateEmpty(false);
+    setIsFallbackMode(false);
+    setLocalSortField(null);
+  }
+
+  function handleTableSort(field) {
+    if (field === 'flightNumber') {
+      if (localSortField === 'flightNumber') {
+        setLocalSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      } else {
+        setLocalSortField('flightNumber');
+        setLocalSortDirection('asc');
+      }
+      return;
+    }
+
+    setLocalSortField(null);
+
+    if (field === 'net') {
+      const nextOrdering = formValues.ordering === 'net' ? '-net' : 'net';
+      setValue('ordering', nextOrdering);
+    } else if (field === 'name') {
+      const nextOrdering = formValues.ordering === 'name' ? '-name' : 'name';
+      setValue('ordering', nextOrdering);
+    } else if (field === 'agency') {
+      const nextOrdering = formValues.ordering === 'name' ? '-name' : 'name';
+      setValue('ordering', nextOrdering);
     }
   }
 
-  function handleSort(field) {
-    if (sortField === field) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  }
-
-  function handleResetFilters() {
-    setAgencyFilter('all');
-    setSearchQuery('');
-  }
- 
   const agencyMap = {};
   for (const launch of launches) {
     const name = launch.launch_service_provider?.name || 'Інші оператори';
@@ -136,119 +145,99 @@ export default function MissionsContainer({ currentYear = new Date().getFullYear
       count,
       color: AGENCY_PALETTE[index % AGENCY_PALETTE.length],
     }));
- 
-  const filteredMissions = launches.filter((mission) => {
-    const agencyName =
-      mission.launch_service_provider?.name || 'Інші оператори';
-    const matchesAgency =
-      agencyFilter === 'all' || agencyName === agencyFilter;
 
-    const query = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      !query ||
-      (mission.name || '').toLowerCase().includes(query) ||
-      agencyName.toLowerCase().includes(query) ||
-      (mission.rocket?.configuration?.name || '')
-        .toLowerCase()
-        .includes(query);
-
-    return matchesAgency && matchesSearch;
-  });
- 
-  const sortedMissions = [...filteredMissions].sort((left, right) => {
-    let comparison;
-
-    switch (sortField) {
-      case 'net':
-        comparison = new Date(left.net) - new Date(right.net);
-        break;
-      case 'name':
-        comparison = (left.name || '').localeCompare(
-          right.name || '',
-          'uk-UA',
-        );
-        break;
-      case 'agency': {
-        const agencyA = left.launch_service_provider?.name || '';
-        const agencyB = right.launch_service_provider?.name || '';
-        comparison = agencyA.localeCompare(agencyB, 'uk-UA');
-        break;
-      }
-      case 'flightNumber': {
-        const numA = left.orbital_launch_attempt_count_year ?? 0;
-        const numB = right.orbital_launch_attempt_count_year ?? 0;
-        comparison = numA - numB;
-        break;
-      }
-      case 'status': {
-        const statusA = left.status?.name || '';
-        const statusB = right.status?.name || '';
-        comparison = statusA.localeCompare(statusB, 'uk-UA');
-        break;
-      }
-      default:
-        comparison = 0;
+  const sortedMissions = useMemo(() => {
+    if (localSortField === 'flightNumber') {
+      return [...launches].sort((a, b) => {
+        const numA = a.orbital_launch_attempt_count_year ?? 0;
+        const numB = b.orbital_launch_attempt_count_year ?? 0;
+        return localSortDirection === 'asc' ? numA - numB : numB - numA;
+      });
     }
+    return launches;
+  }, [launches, localSortField, localSortDirection]);
 
-    return sortDirection === 'asc' ? comparison : -comparison;
-  });
-
- 
   const selectedMission =
-    sortedMissions.find((m) => m.id === selectedId) ??
-    sortedMissions[0] ??
+    sortedMissions.find((m) => m.id === selectedId) ||
+    sortedMissions[0] ||
     null;
 
-  const upcomingChronological = [...launches].sort(
-    (a, b) => new Date(a.net) - new Date(b.net),
-  );
+  const upcomingChronological = useMemo(() => {
+    return [...launches].sort((a, b) => new Date(a.net) - new Date(b.net));
+  }, [launches]);
+
   const nextLaunch = upcomingChronological[0] ?? null;
 
-  const launchesThisYear = launches.filter(
-    (m) => new Date(m.net).getFullYear() === currentYear,
-  );
+  const launchesThisYear = useMemo(() => {
+    return launches.filter(
+      (m) => new Date(m.net).getFullYear() === currentYear,
+    );
+  }, [launches, currentYear]);
+
   const yearDisplayCount =
     launchesThisYear.length > 0 ? launchesThisYear.length : launches.length;
 
-  const kpis = [
-    {
-      id: 'next',
-      title: 'Найближчий запуск',
-      value: nextLaunch ? formatDate(nextLaunch.net) : '—',
-      unit: '',
-      change: nextLaunch ? formatRelativeDays(nextLaunch.net) : 'Немає даних',
-      description: nextLaunch
-        ? `${nextLaunch.name} (${nextLaunch.launch_service_provider?.name || 'Оператор'})`
-        : 'Очікуємо розклад',
-      icon: 'rocket',
-      accent: 'lavender',
-    },
-    {
-      id: 'total',
-      title: `Запуски у ${currentYear}`,
-      value: yearDisplayCount,
-      unit: 'запусків',
-      change: isFallbackMode
-        ? 'Резервна копія'
-        : `+${launches.length} у вибірці API`,
-      description: 'заплановані місії в активному розкладі',
-      icon: 'calendar',
-      accent: 'lime',
-    },
-    {
-      id: 'agencies',
-      title: 'Агенції в огляді',
-      value: dynamicAgencies.length.toString().padStart(2, '0'),
-      unit: 'агенції',
-      change: `Топ: ${dynamicAgencies[0]?.name || 'SpaceX'}`,
-      description: 'провайдери з активними місіями',
-      icon: 'globe',
-      accent: 'peach',
-    },
-  ];
+  const kpis = useMemo(
+    () => [
+      {
+        id: 'next',
+        title: 'Найближчий запуск',
+        value: nextLaunch ? formatDate(nextLaunch.net) : '—',
+        unit: '',
+        change: nextLaunch
+          ? formatRelativeDays(nextLaunch.net)
+          : 'Немає у вибірці',
+        description: nextLaunch
+          ? `${nextLaunch.name} (${nextLaunch.launch_service_provider?.name || 'Оператор'})`
+          : 'Змініть параметри пошуку',
+        icon: 'rocket',
+        accent: 'lavender',
+      },
+      {
+        id: 'total',
+        title: `Запуски у вибірці (${currentYear})`,
+        value: yearDisplayCount,
+        unit: 'запусків',
+        change: isFallbackMode
+          ? 'Резервна копія'
+          : `Ліміт: ${formValues.limit}`,
+        description: `активні місії за фільтрами (всього: ${launches.length})`,
+        icon: 'calendar',
+        accent: 'lime',
+      },
+      {
+        id: 'agencies',
+        title: 'Агенції у вибірці',
+        value: dynamicAgencies.length.toString().padStart(2, '0'),
+        unit: 'агенції',
+        change: `Топ: ${dynamicAgencies[0]?.name || '—'}`,
+        description: 'провайдери за поточним запитом',
+        icon: 'globe',
+        accent: 'peach',
+      },
+    ],
+    [
+      nextLaunch,
+      currentYear,
+      yearDisplayCount,
+      isFallbackMode,
+      formValues.limit,
+      launches.length,
+      dynamicAgencies,
+    ],
+  );
+
+  const tableSortField =
+    localSortField ||
+    (formValues.ordering.includes('name') ? 'name' : 'net');
+  const tableSortDirection = localSortField
+    ? localSortDirection
+    : formValues.ordering.startsWith('-')
+      ? 'desc'
+      : 'asc';
 
   return (
-    <div className="missions-container-root"> 
+    <div className="missions-container-root">
       <div className="live-api-bar">
         <div className="api-status-info">
           <span
@@ -262,20 +251,23 @@ export default function MissionsContainer({ currentYear = new Date().getFullYear
           />
           <span className="api-status-text">
             {isLoading
-              ? 'Запит до API виконується...'
+              ? 'useFetch: виконується запит...'
               : error
                 ? 'Помилка підключення до API'
                 : isFallbackMode
                   ? 'Використовуються резервні дані (Offline)'
-                  : 'API The Space Devs (ll.thespacedevs.com) · Пряме підключення'}
+                  : 'ЛР3 · Space Devs API + react-hook-form + useDebounce + useFetch'}
           </span>
         </div>
- 
-        <div className="api-test-tools" aria-label="Інструменти тестування станів">
+
+        <div
+          className="api-test-tools"
+          aria-label="Інструменти тестування станів"
+        >
           <button
             type="button"
             className="test-btn"
-            title="Оновити дані з API"
+            title="Оновити дані через useFetch.refetch()"
             disabled={isLoading}
             onClick={handleRetry}
           >
@@ -285,7 +277,7 @@ export default function MissionsContainer({ currentYear = new Date().getFullYear
           <button
             type="button"
             className={`test-btn ${simulateError ? 'test-btn-active' : ''}`}
-            title="Змоделювати помилку сервера для демонстрації стану Error"
+            title="Змоделювати стан Error для захисту"
             onClick={() => {
               setSimulateEmpty(false);
               setSimulateError((prev) => !prev);
@@ -297,7 +289,7 @@ export default function MissionsContainer({ currentYear = new Date().getFullYear
           <button
             type="button"
             className={`test-btn ${simulateEmpty ? 'test-btn-active' : ''}`}
-            title="Змоделювати порожню відповідь для демонстрації стану Empty"
+            title="Змоделювати стан Empty для захисту"
             onClick={() => {
               setSimulateError(false);
               setSimulateEmpty((prev) => !prev);
@@ -308,114 +300,77 @@ export default function MissionsContainer({ currentYear = new Date().getFullYear
           </button>
         </div>
       </div>
- 
-      {isLoading ? (
-        <LoadingState />
-      ) : error ? (
-        <ErrorState
-          error={error}
-          onRetry={handleRetry}
-          onUseFallback={handleUseFallback}
-        />
-      ) : launches.length === 0 ? (
-        <EmptyState
-          title="Немає запусків у базі API"
-          message="Сервер повернув порожній список місій або режим тестування Empty активний."
-          onReset={handleRetry}
-        />
-      ) : (
-        <> 
-          <KpiGrid kpis={kpis} />
- 
-          <div id="missions">
-            <WidgetPanel
-              title="Найближчі космічні місії"
-              eyebrow="Таблиця запусків · реальні дані"
-              className="missions-panel"
-              aside={
-                <div className="panel-controls-row"> 
-                  <div className="search-box">
-                    <Icon name="search" size={14} className="search-icon" />
-                    <input
-                      type="search"
-                      placeholder="Пошук місії / ракети..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      aria-label="Пошук місії"
-                    />
-                  </div>
- 
-                  <label className="filter-label">
-                    <span>Агенція</span>
-                    <select
-                      value={agencyFilter}
-                      onChange={(e) => setAgencyFilter(e.target.value)}
-                      aria-label="Фільтр за космічною агенцією"
-                    >
-                      <option value="all">Усі агенції ({launches.length})</option>
-                      {dynamicAgencies.map((agency) => (
-                        <option key={agency.id} value={agency.name}>
-                          {agency.name} ({agency.count})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              }
-            >
-              <div className="missions-layout">
-                <div className="mission-list">
-                  <div className="list-summary">
-                    <p>
-                      Клікніть на рядок або колонку для сортування (
-                      <strong>
-                        {sortField === 'net'
-                          ? 'за датою'
-                          : sortField === 'name'
-                            ? 'за назвою'
-                            : sortField === 'agency'
-                              ? 'за агенцією'
-                              : sortField === 'flightNumber'
-                                ? 'за № польоту'
-                                : 'за статусом'}
-                        {' '}({sortDirection === 'asc' ? 'зростання ▲' : 'спадання ▼'})
-                      </strong>
-                      ).
-                    </p>
-                    <span aria-live="polite">
-                      Відображено {sortedMissions.length} із {launches.length}
-                    </span>
-                  </div>
 
-                  {sortedMissions.length === 0 ? (
-                    <EmptyState
-                      title="Нічого не знайдено"
-                      message="За вказаними критеріями пошуку або фільтра немає місій."
-                      onReset={handleResetFilters}
-                    />
-                  ) : (
-                    <MissionsTable
-                      missions={sortedMissions}
-                      selectedId={selectedMission?.id}
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      onSelect={(id) => setSelectedId(id)}
-                    />
-                  )}
- 
-                  <AgencyChart
-                    agencies={dynamicAgencies}
-                    year={currentYear}
-                  />
+      <WidgetPanel
+        title="Космічні запуски та розклад місій"
+        eyebrow="Контрольована форма фільтрів · useDebounce + useFetch"
+        className="missions-panel"
+      >
+        <FilterPanel
+          control={control}
+          reset={reset}
+          watchedValues={formValues}
+          availableAgencies={dynamicAgencies}
+          onResetCustom={handleFullReset}
+          isLoading={isLoading}
+        />
+
+        {isLoading ? (
+          <LoadingState message="useFetch завантажує актуальні місії з API Space Devs..." />
+        ) : error ? (
+          <ErrorState
+            error={error}
+            onRetry={handleRetry}
+            onUseFallback={handleUseFallback}
+          />
+        ) : launches.length === 0 ? (
+          <EmptyState
+            title="Місій не знайдено за заданими фільтрами"
+            message="Спробуйте змінити пошуковий запит, обрати іншу агенцію або натисніть «Скинути фільтри»."
+            onReset={handleFullReset}
+          />
+        ) : (
+          <>
+            <KpiGrid kpis={kpis} />
+
+            <div className="missions-layout">
+              <div className="mission-list">
+                <div className="list-summary">
+                  <p>
+                    Знайдено <strong>{sortedMissions.length}</strong> місій
+                    {formValues.search && (
+                      <span>
+                        {' '}
+                        за запитом &ldquo;{formValues.search}&rdquo;
+                      </span>
+                    )}
+                    . Клікніть на рядок або колонку для сортування.
+                  </p>
+                  <span aria-live="polite">
+                    Показано {sortedMissions.length}
+                  </span>
                 </div>
- 
-                <MissionDetails mission={selectedMission} />
+
+                <MissionsTable
+                  missions={sortedMissions}
+                  selectedId={selectedMission?.id}
+                  sortField={tableSortField}
+                  sortDirection={tableSortDirection}
+                  onSort={handleTableSort}
+                  onSelect={(id) => setSelectedId(id)}
+                />
+
+                <AgencyChart
+                  agencies={dynamicAgencies}
+                  year={currentYear}
+                />
               </div>
-            </WidgetPanel>
-          </div>
-        </>
-      )}
+
+              <MissionDetails mission={selectedMission} />
+            </div>
+          </>
+        )}
+      </WidgetPanel>
     </div>
   );
 }

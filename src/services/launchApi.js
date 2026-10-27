@@ -12,10 +12,15 @@ export class LaunchApiService {
   }
 
   async getUpcomingLaunches({
+    search = '',
+    ordering = 'net',
     limit = 25,
+    agency = 'all',
+    status = 'all',
     signal,
     simulateError = false,
     simulateEmpty = false,
+    useFallback = false,
   } = {}) {
     if (simulateError) {
       await new Promise((resolve) => setTimeout(resolve, 600));
@@ -25,13 +30,38 @@ export class LaunchApiService {
     }
 
     if (simulateEmpty) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 400));
       return [];
     }
 
+    if (useFallback) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      return this._filterFallbackLaunches({
+        search,
+        ordering,
+        limit,
+        agency,
+        status,
+      });
+    }
+
     try {
+      const queryParams = { limit };
+
+      if (search && search.trim()) {
+        queryParams.search = search.trim();
+      }
+
+      if (ordering) {
+        queryParams.ordering = ordering;
+      }
+
+      if (agency && agency !== 'all') {
+        queryParams.lsp__name = agency;
+      }
+
       const response = await this.client.get('/launch/upcoming/', {
-        params: { limit },
+        params: queryParams,
         signal,
       });
 
@@ -40,7 +70,31 @@ export class LaunchApiService {
         throw new Error('Отримано неочікуваний формат відповіді від API');
       }
 
-      return data.results;
+      let results = data.results;
+
+      if (status && status !== 'all') {
+        results = results.filter((launch) => {
+          const abbrev = (launch.status?.abbrev || '').toLowerCase();
+          const name = (launch.status?.name || '').toLowerCase();
+          if (status === 'go') {
+            return abbrev === 'go' || name.includes('go');
+          }
+          if (status === 'tbc') {
+            return (
+              abbrev === 'tbc' ||
+              abbrev === 'tbd' ||
+              name.includes('confirmed') ||
+              name.includes('scheduled')
+            );
+          }
+          if (status === 'hold') {
+            return abbrev === 'hold' || name.includes('hold');
+          }
+          return true;
+        });
+      }
+
+      return results;
     } catch (error) {
       if (
         axios.isCancel(error) ||
@@ -51,21 +105,21 @@ export class LaunchApiService {
       }
 
       if (error.response) {
-        const { status, statusText } = error.response;
-        if (status === 429) {
+        const { status: httpStatus, statusText } = error.response;
+        if (httpStatus === 429) {
           throw new Error(
             'Перевищено безкоштовний ліміт запитів API (15 запитів/год). Зачекайте декілька хвилин або перемкніться на резервні дані.',
             { cause: error },
           );
         }
-        if (status >= 500) {
+        if (httpStatus >= 500) {
           throw new Error(
-            `Сервер Space Devs тимчасово недоступний (HTTP ${status}). Спробуйте пізніше.`,
+            `Сервер Space Devs тимчасово недоступний (HTTP ${httpStatus}). Спробуйте пізніше.`,
             { cause: error },
           );
         }
         throw new Error(
-          `Помилка завантаження даних із сервера: HTTP ${status} (${statusText || 'Error'})`,
+          `Помилка завантаження даних із сервера: HTTP ${httpStatus} (${statusText || 'Error'})`,
           { cause: error },
         );
       } else if (error.request) {
@@ -77,6 +131,63 @@ export class LaunchApiService {
 
       throw error;
     }
+  }
+
+  _filterFallbackLaunches({
+    search = '',
+    ordering = 'net',
+    limit = 25,
+    agency = 'all',
+    status = 'all',
+  } = {}) {
+    let items = [...FALLBACK_LAUNCHES];
+
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      items = items.filter(
+        (m) =>
+          m.name?.toLowerCase().includes(q) ||
+          m.launch_service_provider?.name?.toLowerCase().includes(q) ||
+          m.rocket?.configuration?.name?.toLowerCase().includes(q) ||
+          m.mission?.description?.toLowerCase().includes(q),
+      );
+    }
+
+    if (agency && agency !== 'all') {
+      items = items.filter(
+        (m) => m.launch_service_provider?.name === agency,
+      );
+    }
+
+    if (status && status !== 'all') {
+      items = items.filter((m) => {
+        const abbrev = (m.status?.abbrev || '').toLowerCase();
+        const name = (m.status?.name || '').toLowerCase();
+        if (status === 'go') return abbrev === 'go' || name.includes('go');
+        if (status === 'tbc') {
+          return (
+            abbrev === 'tbc' ||
+            abbrev === 'tbd' ||
+            name.includes('confirmed') ||
+            name.includes('scheduled')
+          );
+        }
+        if (status === 'hold') return abbrev === 'hold' || name.includes('hold');
+        return true;
+      });
+    }
+
+    if (ordering === 'net') {
+      items.sort((a, b) => new Date(a.net) - new Date(b.net));
+    } else if (ordering === '-net') {
+      items.sort((a, b) => new Date(b.net) - new Date(a.net));
+    } else if (ordering === 'name') {
+      items.sort((a, b) => a.name.localeCompare(b.name, 'uk-UA'));
+    } else if (ordering === '-name') {
+      items.sort((a, b) => b.name.localeCompare(a.name, 'uk-UA'));
+    }
+
+    return items.slice(0, limit);
   }
 
   async getLaunchById(id, { signal } = {}) {
